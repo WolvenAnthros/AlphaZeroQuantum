@@ -219,7 +219,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         state, reward, done = game.move(state=state, idx=current_index, action=action)  # get reward and next state
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if reward > reward_threshold or done:
+        if reward > reward_threshold or done or reward > 1:
             result = reward
             if reward > reward_threshold:
                 logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')

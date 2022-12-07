@@ -13,12 +13,12 @@ args = {
         'SGD_momentum': 0.9,  # gradient descent momentum
         'training_batch_size': 256,  # number of states randomly extracted from the buffer to train Apprentice
         'training_rounds': 40,  # number of Apprentice learning rounds after every Best Player self-play
-        'min_replay_to_train': 5000,  # minimal size of replay buffer to enable training
+        'min_replay_to_train': 8000,  # minimal size of replay buffer to enable training
         'steps_before_tau_0': 0  # number of gamesteps with forced exploration (noise applied to action probs)
     },
     'evaluation_config': {
         'best_net_win_ratio': 0.60,  # percentage of wins for Apprentice to become new Best Player
-        'num_steps_before_evaluation': 60,  # number of Best Player games before evaluation
+        'num_steps_before_evaluation': 100,  # number of Best Player games before evaluation
         'evaluation_rounds': 10  # number of games between Apprentice and Best Player
     },
     'MCTS_config': {
@@ -44,11 +44,11 @@ args = {
     },
     'pulse_array_length': 121,
     'reward_threshold': 0.001,
-    'reward_threshold_to_save': 0.7,
+    'reward_threshold_to_save': 0.5,
     'reset_reward_threshold_after_eval': False,
     'number_of_actions': 3,
     'environment': 'cuda',  # cuda
-    'run_name': '1/12/fidelity',
+    'run_name': '6_12/new_fidelity_notau',
     'save_folder_name': 'saves',
     'logging_config': {
         'level': logging.DEBUG,

@@ -15,8 +15,6 @@ omega_01 = config['omega_01']
 mu = config['mu']
 pulse_period = 2 * np.pi / config['omega_osc']
 counts = config['num_timesteps']
-mu = config['mu']
-omega_01 = config['omega_01']
 amp = config['amp']
 tau = pulse_period / counts
 pulse_period = 2 * np.pi / config['omega_osc']
@@ -127,27 +125,92 @@ The process of reward calculation consists of several steps:
 '''
 
 
+def make_alpha_state(dim, n):
+    try:
+        assert n in range(1, 7, 1)
+        alpha_1 = np.zeros((dim, 1), dtype='complex128')
+        alpha_1[1][0] = 1
+        alpha_2 = np.zeros((dim, 1), dtype='complex128')
+        alpha_2[0][0] = 1
+        if n == 1:
+            return alpha_1
+        elif n == 2:
+            return alpha_2
+        elif n == 3:
+            return 1 / np.sqrt(2) * (alpha_1 + alpha_2)
+        elif n == 4:
+            return 1 / np.sqrt(2) * (alpha_1 - alpha_2)
+        elif n == 5:
+            return 1 / np.sqrt(2) * (alpha_1 + alpha_2 * 1j)
+        elif n == 6:
+            return 1 / np.sqrt(2) * (alpha_1 - alpha_2 * 1j)
+        else:
+            return None
+    except ValueError:
+        print('Please enter an integer!')
+    except AssertionError:
+        print('PLease enter numbers from 1 to 6')
+        return None
+
+'''
+Old version probability calc
+'''
+# @njit(cache=True, fastmath=True, nogil=True)
+# def reward_calculation(
+#         pulse_list
+# ):
+#     psi = psi_matrix
+#     for pulse in pulse_list:
+#         if pulse == 1:
+#             psi = positive @ psi
+#         elif pulse == -1:
+#             psi = negative @ psi
+#         elif pulse == 0:
+#             psi = empty @ psi
+#
+#     psi_conj = psi.conjugate()
+#     probability_excited = excited_state @ psi_conj
+#     probability_ground = ground_state @ psi_conj
+#     probability_third = third_state @ psi_conj
+#     probability_excited = abs(np.sum(probability_excited)) ** 2
+#     probability_ground = abs(np.sum(probability_ground)) ** 2
+#     probability_third = abs(np.sum(probability_third)) ** 2
+#     # (probability_ground +
+#     # fidelity = probability_excited*2
+#     # if probability_excited > 0.4:
+#     fidelity = (probability_excited - probability_third * 10) * 2
+#     # fidelity = 1 - (probability_ground+probability_excited)-probability_third
+#     return fidelity
+
+
+dimensions = config['n_dimensions']
+rotation_core = np.array([[0, -1j], [1, 0]])  # if rotation_type == 'y' else np.array([[0, 1], [-1j, 0]])
+rotation_matrix = np.identity(dimensions, dtype='cfloat')
+rotation_matrix[0:2, 0:2] = rotation_core
+fidelity = 0
+alpha_state_list = [make_alpha_state(dimensions, i).reshape((4,)) for i in range(1, 7, 1)]
+alpha_state_list = np.array(alpha_state_list)
+
+
 @njit(cache=True, fastmath=True, nogil=True)
 def reward_calculation(
-        pulse_list
+        pulse_list,
 ):
-    psi = psi_matrix
-    for pulse in pulse_list:
-        if pulse == 1:
-            psi = positive @ psi
-        elif pulse == -1:
-            psi = negative @ psi
-        elif pulse == 0:
-            psi = empty @ psi
-
-    psi_conj = psi.conjugate()
-    probability_excited = excited_state @ psi_conj
-    probability_ground = ground_state @ psi_conj
-    probability_third = third_state @ psi_conj
-    probability_excited = abs(np.sum(probability_excited)) ** 2
-    probability_ground = abs(np.sum(probability_ground)) ** 2
-    probability_third = abs(np.sum(probability_third)) ** 2
-    fidelity = 1 - (probability_ground + probability_excited) - probability_third
+    fidelity = 0.0
+    for psi in alpha_state_list:
+        psi_g = rotation_matrix @ psi
+        psi_g = psi_g.conjugate()
+        psi = psi.transpose()
+        for pulse in pulse_list:
+            if pulse == 1:
+                psi = positive @ psi
+            elif pulse == -1:
+                psi = negative @ psi
+            elif pulse == 0:
+                psi = empty @ psi
+        probability = psi @ psi_g
+        probability = abs(probability) ** 2
+        fidelity = fidelity + 1 / 6 * probability
     return fidelity
 
 
@@ -155,12 +218,13 @@ if __name__ == '__main__':
     # pulse list example made with genetic algorithm
     pulse_str = '-1-11111-1-1-1111111-1-101111-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-11111-1-1-1-111110\
     -1-1-101111-1-1-1-111111-1-1-111100-1-1-10111-1-1-1-1011-1-1-1-1-11111'
+
     # pulse list made by neural network
-    pulse_str = ' -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1-1  -1  -1   1   1   1  -1  -1 \
-    -1  -1  -1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -11   1  \
-     1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -1  -1   11   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1\
-      -1   1   1   11  -1  -1  -1  -1   0   1   1   1   0  -1  -1  -1  -1   1   1   1   1-1  -1  -1   1   1   1   1   0\
-        -1  -1  -1  -1'
+    # pulse_str = ' 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+
+    # pulse_str = '-1  -1  -1   1   1   1   1   1  -1  -1  -1   1   1   1   1   1  -1  -1-1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   11   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   11   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   11  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1-1  -1  -1  -1   1   1   1  -1  -1  -1  -1   0'
+
+    # pulse_str = '1  -1   1   1   1   1   1   1  -1  -1  -1   1   1   1   1   1  -1  -1-1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   11   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   11   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   11  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1   1   1   1  -1  -1-1  -1   1   1   1'
 
     # from string to pulse list
     pulse_str = pulse_str.replace('1', '1,')
@@ -169,8 +233,10 @@ if __name__ == '__main__':
     pulse_list.pop(-1)
     pulse_list = [int(pulse) for pulse in pulse_list]
 
+    print(reward_calculation(pulse_list))
+
     # speed demonstration
     # for _ in range(30000):
     #     reward_calculation(pulse_list=pulse_list)
 
-    print(reward_calculation(pulse_list=pulse_list))
+    # print(reward_calculation(pulse_list=pulse_list))
