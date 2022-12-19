@@ -155,32 +155,32 @@ def make_alpha_state(dim, n):
 '''
 Old version probability calc
 '''
-# @njit(cache=True, fastmath=True, nogil=True)
-# def reward_calculation(
-#         pulse_list
-# ):
-#     psi = psi_matrix
-#     for pulse in pulse_list:
-#         if pulse == 1:
-#             psi = positive @ psi
-#         elif pulse == -1:
-#             psi = negative @ psi
-#         elif pulse == 0:
-#             psi = empty @ psi
-#
-#     psi_conj = psi.conjugate()
-#     probability_excited = excited_state @ psi_conj
-#     probability_ground = ground_state @ psi_conj
-#     probability_third = third_state @ psi_conj
-#     probability_excited = abs(np.sum(probability_excited)) ** 2
-#     probability_ground = abs(np.sum(probability_ground)) ** 2
-#     probability_third = abs(np.sum(probability_third)) ** 2
-#     # (probability_ground +
-#     # fidelity = probability_excited*2
-#     # if probability_excited > 0.4:
-#     fidelity = (probability_excited - probability_third * 10) * 2
-#     # fidelity = 1 - (probability_ground+probability_excited)-probability_third
-#     return fidelity
+@njit(cache=True, fastmath=True, nogil=True)
+def reward_calculation(
+        pulse_list
+):
+    psi = psi_matrix
+    for pulse in pulse_list:
+        if pulse == 1:
+            psi = positive @ psi
+        elif pulse == -1:
+            psi = negative @ psi
+        elif pulse == 0:
+            psi = empty @ psi
+
+    psi_conj = psi.conjugate()
+    probability_excited = excited_state @ psi_conj
+    probability_ground = ground_state @ psi_conj
+    probability_third = third_state @ psi_conj
+    probability_excited = abs(np.sum(probability_excited)) ** 2
+    probability_ground = abs(np.sum(probability_ground)) ** 2
+    probability_third = abs(np.sum(probability_third)) ** 2
+    # (probability_ground +
+    # fidelity = probability_excited*2
+    # if probability_excited > 0.4:
+    #fidelity = (probability_excited - probability_third * 10) * 2
+    fidelity = 1 - (abs(probability_ground-0.5)+abs(probability_excited-0.5))-probability_third
+    return fidelity
 
 
 dimensions = config['n_dimensions']
@@ -192,26 +192,26 @@ alpha_state_list = [make_alpha_state(dimensions, i).reshape((4,)) for i in range
 alpha_state_list = np.array(alpha_state_list)
 
 
-@njit(cache=True, fastmath=True, nogil=True)
-def reward_calculation(
-        pulse_list,
-):
-    fidelity = 0.0
-    for psi in alpha_state_list:
-        psi_g = rotation_matrix @ psi
-        psi_g = psi_g.conjugate()
-        psi = psi.transpose()
-        for pulse in pulse_list:
-            if pulse == 1:
-                psi = positive @ psi
-            elif pulse == -1:
-                psi = negative @ psi
-            elif pulse == 0:
-                psi = empty @ psi
-        probability = psi @ psi_g
-        probability = abs(probability) ** 2
-        fidelity = fidelity + 1 / 6 * probability
-    return fidelity
+# @njit(cache=True, fastmath=True, nogil=True)
+# def reward_calculation(
+#         pulse_list,
+# ):
+#     fidelity = 0.0
+#     for psi in alpha_state_list:
+#         psi_g = rotation_matrix @ psi
+#         psi_g = psi_g.conjugate()
+#         psi = psi.transpose()
+#         for pulse in pulse_list:
+#             if pulse == 1:
+#                 psi = positive @ psi
+#             elif pulse == -1:
+#                 psi = negative @ psi
+#             elif pulse == 0:
+#                 psi = empty @ psi
+#         probability = psi @ psi_g
+#         probability = abs(probability) ** 2
+#         fidelity = fidelity + 1 / 6 * probability
+#     return fidelity
 
 
 if __name__ == '__main__':
@@ -220,7 +220,7 @@ if __name__ == '__main__':
     -1-1-101111-1-1-1-111111-1-1-111100-1-1-10111-1-1-1-1011-1-1-1-1-11111'
 
     # pulse list made by neural network
-    # pulse_str = ' 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+    #pulse_str = ' 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
 
     # pulse_str = '-1  -1  -1   1   1   1   1   1  -1  -1  -1   1   1   1   1   1  -1  -1-1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   11   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   11   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   11  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1-1  -1  -1  -1   1   1   1  -1  -1  -1  -1   0'
 
@@ -232,7 +232,8 @@ if __name__ == '__main__':
     pulse_list = pulse_str.split(',')
     pulse_list.pop(-1)
     pulse_list = [int(pulse) for pulse in pulse_list]
-
+    minipulse = np.array([ 1, -1, -1,  0,  0])
+    pulse_list = np.tile(minipulse, int(args['pulse_array_length']/5))
     print(reward_calculation(pulse_list))
 
     # speed demonstration

@@ -98,9 +98,8 @@ if __name__ == "__main__":
 
     # inform the user about the start
     logs.info(f'Filling the replay buffer, needed length is {min_replays}')
-
     # initialize NNets for Best Player and Apprentice
-    net = model.Net(input_shape=model.observation_shape, actions_n=action_num).to(device)
+    net = model.Net(input_shape=model.observation_shape, actions_n=action_num, length_n=args['max_subarray_length']).to(device)
     best_net = ptan.agent.TargetNet(net)
     optimizer = optim.SGD(net.parameters(), lr=config_training['learning_rate'],
                           momentum=config_training['SGD_momentum'])
@@ -120,7 +119,7 @@ if __name__ == "__main__":
                                                       steps_before_tau_0=config_training['steps_before_tau_0'],
                                                       mcts_searches=config_training['MCTS_batch_searches'],
                                                       mcts_batch_size=config_training['MCTS_batch_size'], device=device,
-                                                      reward_threshold=reward_threshold, enable_highlight=False)
+                                                      reward_threshold=reward_threshold, enable_highlight=args['enable_highlight'])
             game_steps += steps
             reward_threshold = new_threshold
 

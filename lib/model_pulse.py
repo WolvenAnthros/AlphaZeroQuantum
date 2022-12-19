@@ -15,7 +15,7 @@ from lib import mcts_pulse as mcts
 from lib import game_pulse as game
 
 # initialize parameters for body convolutional layers
-observation_shape = (1, args['pulse_array_length'])
+observation_shape = (1, args['max_subarray_length'])
 
 conv_kernel_size = args['convNet_config']['conv_layers_kernel_size']
 conv_layers_padding = args['convNet_config']['conv_layers_padding']
@@ -30,8 +30,7 @@ class Net(nn.Module):
     1. value head (outputs predicted value for the current state)
     2. policy head (outputs predicted action probabilities for the current state)
     """
-
-    def __init__(self, input_shape, actions_n):
+    def __init__(self, input_shape, actions_n, length_n):
         super(Net, self).__init__()
         # convolutional input layer
         self.conv_input = nn.Sequential(
@@ -108,6 +107,10 @@ class Net(nn.Module):
         self.policy = nn.Sequential(
             nn.Linear(in_features=conv_policy_size, out_features=actions_n)
         )
+        self.policy_length = nn.Sequential(
+            nn.Linear(in_features=conv_policy_size, out_features=length_n)
+        )
+
 
     def _get_conv_val_size(self,
                            shape):  # reshape convolutional
@@ -134,7 +137,7 @@ class Net(nn.Module):
         value = self.value(value.view(batch_size,
                                       -1))  # see nn.Tensor.view() documentation
         policy = self.conv_policy(v)  # depends on body layers
-        policy = self.policy(policy.view(batch_size, -1))
+        policy = self.policy(policy.view(batch_size, -1)), self.policy_length(policy.view(batch_size, -1))
         return policy, value
 
 
@@ -147,14 +150,11 @@ def state_lists_to_batch(state_lists, device='cpu'):
     """
     assert isinstance(state_lists, list)
     batch_size = len(state_lists)  # size of batch
+    state_array_lists = [np.frombuffer(state, dtype=int) for state in state_lists]
     batch = np.zeros((batch_size,) + observation_shape,
                      dtype=np.float)  # an array of zeros with the shape of (batch_size,1,PULSE_LENGTH)
-    for idx, state in enumerate(state_lists):
-        state_array = np.frombuffer(state, dtype=int)
-        batch[idx] = state_array
-        # string representation, deprecated
-        # state_array = np.array(re.findall(r'(?<!\s)(?<!\s\d)(?<!\s\d{2})[+-]?\d', state),dtype=int) # tight printing
-        # state_array = np.array(re.findall(r'[+-]?\d', state), dtype=int)
+    for idx, state in enumerate(state_array_lists):
+        batch[idx] = state
     # create an array based on a string, separator is a whitespace pytotch Tensor is a ndmatrix, so it is inferred
     # that batch should  have the dimensionality of [state_lists,1,PULSE_LENGTH]
     return torch.tensor(batch).to(device,
@@ -213,16 +213,20 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         # extract the best actions based on their visit times or on distribution + visit times (see MCTS)
         probs, _ = mcts_stores.get_policy_value(state=state, tau=tau)
         game_history.append((state, probs))  # game history saving
-        action = np.random.choice(mcts.action_num, p=probs)
+        action = np.random.choice(mcts.action_num, p=probs[0])
+        length = np.random.choice(args['max_subarray_length'], p=probs[1])
 
         # execute a game move
-        state, reward, done = game.move(state=state, idx=current_index, action=action)  # get reward and next state
+        state, reward, done, subarray_length = game.move(state=state, idx=current_index, action=action,subarray_length=length)  # get reward and next state
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
         if reward > reward_threshold or done or reward > 1:
             result = reward
+            state_array = np.frombuffer(state, dtype=int)
+            state_array = state_array[:subarray_length]
             if reward > reward_threshold:
-                logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')
+                logs.debug(f'State:  {state_array}')
+                logs.debug(f'Length:{subarray_length}')
                 reward_threshold = reward
                 # train.reward_threshold = reward
                 if replay_buffer is not None:
@@ -232,12 +236,15 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
                         )
             # save the best pulse lists into a separate txt file
             if result > args['reward_threshold_to_save']:
+                num_repetitions = int(args['pulse_array_length']/subarray_length)
                 saves_path = os.path.join(args['save_folder_name'], args['run_name'])
                 best_pulses_save_path = os.path.join(saves_path, 'best_pulses.txt')
                 with open(best_pulses_save_path, 'a') as file:
-                    file.write(f'State: {np.frombuffer(state, dtype=int)} \n Result: {result} \n')
+                    file.write(f'State: {state_array} \n Length:{subarray_length}\n'
+                               f'Number of repetitions:{num_repetitions} \n Result: {result} \n')
             if enable_highlight:
-                logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')
+                logs.debug(f'State:  {state_array}')
+                logs.debug(f'Length:{subarray_length}')
             logs.debug(f'Result: {result:.5f}')
             break
 

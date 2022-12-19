@@ -164,7 +164,7 @@ def simulation(
                 probability_third = abs(np.sum(probability_third)) ** 2
                 end_probability_third.append(probability_third)
                 # if index == (len(pulse_list)-1) and k == counts - 1:
-                if abs(probability_excited - 0.5) < 0.015:
+                if abs(probability_excited - 0.5) < 0.005:
                     print(f'time: {t(k)}, count: {k}')
                     leakage = 0
                     for dim in range(2, dimension):
@@ -209,6 +209,22 @@ def plot_show(ground,
     # plt.yscale("log")
     plt.show()
 
+num_timestemps = config['num_timesteps']
+
+def pulse_show(pulse_list):
+    pulse_period = 2 * np.pi / config['omega_osc']
+    tau = pulse_period/ num_timestemps
+    axis = [x*tau for x in range(len(pulse_list)*num_timestemps)]
+
+    pulses = []
+    for pulse in pulse_list:
+        pulse_timed = [pulse*config['amp'] if x < config['pulse_time'] else 0 for x in range(num_timestemps)]
+        pulses += pulse_timed
+    fig, at = plt.subplots()
+    at.plot(axis, pulses, label='pulses')
+    at.set_xlabel('time, ns')
+    at.set_ylabel('amplitude')
+    plt.show()
 
 if __name__ == '__main__':
     pulse_str = '-1-11111-1-1-1111111-1-101111-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-111111-1-1-111100-1-1-10111-1-1-1-1011-1-1-1-1-11111'
@@ -222,13 +238,27 @@ if __name__ == '__main__':
 
     pulse_str = '-1  -1  -1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1-1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -11   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -1   11   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   11   1  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1-1  -1  -1  -1  -1   1   1      0   0   0   0'
 
+    # for omega = 5
+    pulse_str = '1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   11   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -10   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   10  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   01   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0'
 
+    pulse_str =  '1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   11   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -10   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   10  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   01   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1  -1  -1  -1'
+
+    #pulse_str =  '1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1-1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   11  -1  -1  -1   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -10   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -1   0   1   1-1  -1   0   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -1   01   1  -1  -1   0   1   0  -1  -1   0   1   0  -1  -1   0   1   0  -1-1   1   0  -1  -1   0   1  -1  -1  -1  -1   0  -1   0   0  -1   0'
     pulse_str = pulse_str.replace('1', '1,')
     pulse_str = pulse_str.replace('0', '0,')
     pulse_list = pulse_str.split(',')
     pulse_list.pop(-1)
-    pulse = re.findall(r'[+-]?\d',pulse_str)
+    pulses = re.findall(r'[+-]?\d',pulse_str)
+    pulses_str =''
+
+
+
+    for pulse in pulses:
+        pulses_str += pulse
+    print(pulses_str)
     pulse_list = [int(pulse) for pulse in pulse_list]
+
     win, end_probability_ground,end_probability_excited,end_probability_third = simulation(pulse_list=pulse_list)
     print(f'Reward: {win}')
-    plot_show(ground=end_probability_ground, excited=end_probability_excited, third=end_probability_third)
+    #plot_show(ground=end_probability_ground, excited=end_probability_excited, third=end_probability_third)
+    pulse_show(pulse_list)

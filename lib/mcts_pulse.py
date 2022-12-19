@@ -71,40 +71,55 @@ class MCTS:
         # We traverse the game tree until we find a game end/an unexplored leaf node
         while current_state in self.probs:
             states.append(current_state)
-
-            action_visits = self.visit_count[current_state]  # list of action visits for current state
-            total_visits_sqrt = m.sqrt(sum(action_visits))  # sqrt of visit count for all actions in a state
+            action_visits = self.visit_count[current_state][0]  # list of action visits for current state
+            length_visits = self.visit_count[current_state][1]
+            total_visits_sqrt_action = m.sqrt(sum(action_visits))  # sqrt of visit count for all actions in a state
+            total_visits_sqrt_length = m.sqrt(sum(length_visits))
             probs = self.probs[current_state]  # probabilities of actions for current state
-            actions_avg_values = self.value_avg[current_state]  # values (average) for all actions in a state
+            actions_avg_values = self.value_avg[current_state][0]  # values (average) for all actions in a state
+            length_avg_values = self.value_avg[current_state][1]
 
             # in the root node we want to add Dirichlet noises to action probabilities
             if state == current_state:  # root node
                 noises = np.random.dirichlet([0.03] * action_num)
-                probs = [  # adding noise to probabilities
+                noises_length = np.random.dirichlet([0.03] * args['max_subarray_length'])
+                probs_action = [  # adding noise to probabilities
                     0.75 * prob + 0.25 * noise
-                    for prob, noise in zip(probs, noises)
+                    for prob, noise in zip(probs[0], noises)
+                ]
+                probs_length = [  # adding noise to probabilities
+                    0.75 * prob + 0.25 * noise
+                    for prob, noise in zip(probs[1], noises_length)
                 ]
             # calculate UCB score for every action in every node we meet
-            ucb_score = [
-                value + self.c_puct * prob * total_visits_sqrt / (1 + count)  # Q + C * P * sqrt(N/1+n)
+            ucb_score_action = [
+                value + self.c_puct * prob * total_visits_sqrt_action / (1 + count)  # Q + C * P * sqrt(N/1+n)
                 for value, prob, count in
-                zip(actions_avg_values, probs, action_visits)
+                zip(actions_avg_values, probs_action, action_visits)
+            ]
+            ucb_score_length = [
+                value + self.c_puct * prob * total_visits_sqrt_length / (1 + count)  # Q + C * P * sqrt(N/1+n)
+                for value, prob, count in
+                zip(length_avg_values, probs_length, length_visits)
             ]
             # all actions are valid, so we skip that part
-            action = int(np.argmax(ucb_score))  # we always choose an action based entirely on UCB score
+            action = int(np.argmax(ucb_score_action))  # we always choose an action based entirely on UCB score
+            length = int(np.argmax(ucb_score_length))
             # argmax returns the indices of the maximum values along an axis (list in our case), \
             # so we should name our actions as (0,1,2)
-            actions.append(action)  # save action
-            current_state, reward, done = game.move(
+            actions.append((action, length))  # save action
+            current_state, reward, done, _ = game.move(
                 state=current_state,
                 idx=current_index,
-                action=action
+                action=action,
+                subarray_length=length
             )
             current_index += 1  # index extension
             # if our reward is non-zero, which means that the game is ended
             # value = reward
             if reward > reward_threshold or done:
                 value = reward
+                break
             # if done:
             #     value = 0
         return value, current_state, current_index, states, actions
@@ -175,17 +190,21 @@ class MCTS:
             )
             # let the net predict action probabilities and values
             logits_v, values_v = net(batch_v)
-
-            probs_v = F.softmax(logits_v, dim=1)
+            logits_action, logits_length = logits_v
+            probs_action = F.softmax(logits_action, dim=1)
+            probs_length = F.softmax(logits_length, dim=1)
             # after prediction, convert them to numpy for further actions
             values = values_v.data.cpu().numpy()  # [:, 0]
-            probs = probs_v.data.cpu().numpy()
+            probs_action = probs_action.data.cpu().numpy()
+            probs_length = probs_length.data.cpu().numpy()
+            probs = probs_action, probs_length
             # then we create the nodes
-            for (leaf_state, states, actions), value, prob in zip(expand_queue, values, probs):
-                self.visit_count[leaf_state] = [0] * args['number_of_actions']
-                self.value[leaf_state] = [0.0] * args['number_of_actions']
-                self.value_avg[leaf_state] = [0.0] * args['number_of_actions']
-                self.probs[leaf_state] = prob
+            for (leaf_state, states, actions), value, prob_action, prob_length in zip(expand_queue, values, probs[0],
+                                                                                      probs[1]):
+                self.visit_count[leaf_state] = np.array([[0] * args['number_of_actions'], [0] * args['max_subarray_length']])
+                self.value[leaf_state] = np.array([[0.0] * args['number_of_actions'], [0.0] * args['max_subarray_length']])
+                self.value_avg[leaf_state] = np.array([[0.0] * args['number_of_actions'], [0.0] * args['max_subarray_length']])
+                self.probs[leaf_state] = prob_action, prob_length
                 backpropagation_queue.append((value, states, actions))
 
         # perform backpropagation
@@ -193,10 +212,16 @@ class MCTS:
             # it's the BACKpropagation so we travel through states and actions backwards
             for state, action in zip(states[::-1],
                                      actions[::-1]):
-                self.visit_count[state][action] += 1  # update visit count
-                self.value[state][action] += value  # update value
-                self.value_avg[state][action] = self.value[state][action] / self.visit_count[state][
-                    action]  # update avg values
+                # TODO: get rid of unnecessary tuple repetitions
+                self.visit_count[state][0][action[0]] += 1  # update visit count
+                self.visit_count[state][1][action[1]] += 1
+                self.value[state][0][action[0]] += value  # update value
+                self.value[state][1][action[1]] += value
+                self.value_avg[state][0][action[0]] = self.value[state][0][action[0]] / self.visit_count[state][0][
+                    action[0]]
+                self.value_avg[state][1][action[1]] = self.value[state][1][action[1]] / self.visit_count[state][1][
+                    action[1]]
+                # update avg values
 
     def get_policy_value(self, state, tau=config['tau']):
         """
@@ -207,11 +232,16 @@ class MCTS:
         """
         counts = self.visit_count[state]  # counts of actions visited
         if tau == 0:
-            probs = [0.0] * args['number_of_actions']
-            probs[np.argmax(counts)] = 1.0  # we choose the most visited action (determenistic approach)
+            probs = np.array([[0.0] * args['number_of_actions'], [0.0] * args['max_subarray_length']])
+            probs[0][np.argmax(counts[0])] = 1.0
+            probs[1][np.argmax(counts[1])] = 1.0  # we choose the most visited action (determenistic approach)
         else:
-            counts = [count ** (1.0 / tau) for count in counts]  # distribution for improved exploration
-            total = sum(counts)  # total sum of counts for all actions
-            probs = [count / total for count in counts]  # normalized "probabilities" of actions based on visit count
+            counts[0] = [count ** (1.0 / tau) for count in counts[0]]  # distribution for improved exploration
+            counts[1] = [count ** (1.0 / tau) for count in counts[1]]
+            total_actions = sum(counts[0])  # total sum of counts for all actions
+            total_lengths = sum(counts[1])
+            probs = ([count / total_actions for count in counts[0]],
+                     [count / total_lengths for count in counts[1]])  # normalized "probabilities" of actions based
+            # on visit count
         values = self.value_avg[state]  # avg values (divided by their visit count?)
         return probs, values
