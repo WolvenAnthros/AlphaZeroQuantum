@@ -238,7 +238,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
                     file.write(f'State: {np.frombuffer(state, dtype=int)} \n Result: {result} \n')
             if enable_highlight:
                 logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')
-            logs.debug(f'Result: {result:.5f}')
+            logs.debug(f'Result: {result:.3f}, Infidelity: {1-result:.2e}')
             break
 
         current_index += 1  # after a move is executed, go to the next index
