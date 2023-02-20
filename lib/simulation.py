@@ -1,16 +1,8 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 from lib.args import args
 import re
-
-def load_object(filename):
-    try:
-        with open(filename, "rb") as f:
-            return pickle.load(f)
-    except Exception as ex:
-        print("Error during unpickling object (Possibly unsupported):", ex)
 
 
 class Operator:
@@ -48,44 +40,25 @@ class Psi:
         self.matrix = np.zeros((self.dimensions, 1))
         self.matrix[0][0] = 1
 
+
 '''
 Initial params
 '''
-# phase = 0
-
-# pulses = [1 for x in range(120)]
-
-
-# Irregular pulse array example
-# pulse_list = [-1,-1,1,1,1,1,-1,-1,-1,1,1,1,1,1,1,-1,-1,0,1,1,1,1,-1,-1,-1,0,1,1,1,1,-1,-1,-1,-1,1,1,1,1,-1,-1,-1,-1,1,1,1,1,0,-1,-1,-1,0,1,1,1,1,-1,-1,-1,-1,1,1,1,1,-1,-1,-1,-1,1,1,1,1,0,-1,-1,-1,0,1,1,1,1,-1,-1,-1,-1,1,1,1,1,1,-1,-1,-1,1,1,1,0,0,-1,-1,-1,0,1,1,1,-1,-1,-1,-1,0,1,1,-1,-1,-1,-1,-1,1,1,1,1
-# ]
-
-pulse_list = [0,1,1,1,-1,0,1,1,1,-1,-1,-1,1,1,-1,-1,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,-1,-1,0,1,1,1,-1,0,1,1,-1,-1,0,1,1,-1,-1,1,1,-1,-1,-1,0,1,1,-1,1,0,1,-1,-1,-1,0,1,-1,-1,-1]
-
-# pulse_str ='-1-11111-1-1-1111111-1-101111-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-111111-1-1-111100-1-1-10111-1-1-1-1011-1-1-1-1-11111'
-
-# pulse_str ='01111-1-1-1111-1-11111-1-10110-1-10111-1-11111-1-1-1111-1-1-11110-1-10111-1-1-1111-1-1-1111-1-1-11110-1-10111-1-1-1111-1-1-1111-1-1-11110-1-1011-1-1-11111-1-1111-1-1-111'
-
-# pulse_str = '1011-1-11-1-111-1011-111-1111-111-101-1-111-1110-111-1-111-111-1-111-101-1-111-1-110-111-1-111-111-1-111-101-1-111-1-110-111-1-111-111-1-110-101-1-111-111-1-11-1-111-1-11'
-
-
 config = args['qbit_simulation_config']
 
-#pulse_list=[]
-# pulse_show = load_object('pulse.pickle')
-# print(pulse_show)
-# print(pulse_list)
 
 def simulation(
-        pulse_list=config['default_pulse_list'],
+        pulse_list=None,
         dimension=config['n_dimensions'],
         omega_01=config['omega_01'],
-        omega_osc=config['omega_osc'],
+        omega_osc = config['omega_osc'],
         amp=config['amp'],
         pulse_time=config['pulse_time'],
         mu=config['mu'],
 ):
-    pulse_period = 2 * np.pi / omega_osc
+
+    if pulse_list is None:
+        pulse_list = [0, 0, 0]
 
     I = np.identity(dimension)  # Identity matrix
     annihilation = Operator(dimension, 0).matrix  # annihilation/creation operators
@@ -104,16 +77,17 @@ def simulation(
     # end_probability_excited|ground|third
     for n in ['excited', 'ground', 'third']:
         globals()['end_probability_%s' % n] = []
+    pulse_period = 2 * np.pi / omega_osc
+    counts = int(pulse_period * config['num_timesteps'] )  # let's take a lot of counts for more reliability
 
+    #tau = pulse_period / counts  # 0.0004
+    tau = pulse_period/counts
     for pulse, index in zip(pulse_list, range(len(pulse_list))):
         '''
         Please pay attention that the pulse_period and pulse_time should converge well, otherwise
         we lose some of the counts
         '''
-        counts = int(pulse_period * 2500)  # let's take a lot of counts for more reliability
-
-        tau = pulse_period / counts  # 0.0004
-        #print(f'Pulse:{pulse}, index: {index}')
+        # print(f'Pulse:{pulse}, index: {index}')
         for k in range(counts):
             # Start of psi calculation
             t = lambda k_: k_ * tau
@@ -142,17 +116,17 @@ def simulation(
             numerator = I - (tau ** 2 / 12) * np.matmul(F, F) - 1j * (tau / 2) * F
             denominator = I - (tau ** 2 / 12) * np.matmul(F, F) + 1j * (tau / 2) * F
             denominator = np.linalg.inv(denominator)
-            fraction = np.matmul(denominator, numerator)
+            fraction = denominator @ numerator
 
-            psi = np.matmul(fraction, psi)
+            psi = fraction @ psi
 
             # excited probability formula
-            probability_excited = np.matmul(excited_state.transpose(), psi.conjugate())
+            probability_excited = excited_state.transpose() @ psi.conjugate()
             probability_excited = abs(np.sum(probability_excited)) ** 2
             end_probability_excited.append(probability_excited)
 
             # ground probability formula
-            probability_ground = np.matmul(ground_state.transpose(), psi.conjugate())
+            probability_ground = ground_state.transpose() @ psi.conjugate()
             probability_ground = abs(np.sum(probability_ground)) ** 2
             end_probability_ground.append(probability_ground)
 
@@ -160,39 +134,33 @@ def simulation(
                 third_state = np.array(eigenpsi[:, [2]])
 
                 # third state probability formula
-                probability_third = np.matmul(third_state.transpose(), psi.conjugate())
+                probability_third = third_state.transpose() @ psi.conjugate()
                 probability_third = abs(np.sum(probability_third)) ** 2
                 end_probability_third.append(probability_third)
-                # if index == (len(pulse_list)-1) and k == counts - 1:
-                if abs(probability_excited - 0.5) < 0.005:
+                if abs(probability_excited - 0.5) < 0.015:
                     print(f'time: {t(k)}, count: {k}')
                     leakage = 0
                     for dim in range(2, dimension):
                         high_state = np.array(eigenpsi[:, [dim]])
                         # third state probability formula
-                        probability_high = np.matmul(high_state.transpose(), psi.conjugate())
+                        probability_high = high_state.transpose() @ psi.conjugate()
                         probability_high = abs(np.sum(probability_high)) ** 2
                         leakage += probability_high
-                        # print('leakage:', leakage)
                     print(f'leakage: {leakage}')
                     print('\n')
-                    return 1,end_probability_ground,end_probability_excited,end_probability_third
+                    return 1, end_probability_ground, end_probability_excited, end_probability_third
 
             else:
-                third_state = 0
                 probability_third = 0
                 end_probability_third.append(probability_third)
-                #PROBA *2 BECAUSE OF MODELLING ONLY HALF OF THE OPERATION
-    #print(f'Excited state probability : {abs(probability_excited)}')
-    return abs(probability_excited*2),end_probability_ground,end_probability_excited,end_probability_third
 
+    return abs(probability_excited * 2), end_probability_ground, end_probability_excited, end_probability_third
 
 
 def plot_show(ground,
               excited,
               third,
               omega_osc=25 * 2 * np.pi):
-
     pulse_period = 2 * np.pi / omega_osc
     counts = int(pulse_period * 2500)
     tau = pulse_period / counts  # 0.0004
@@ -205,20 +173,22 @@ def plot_show(ground,
     at.set_xlabel('time, ns')
     at.set_ylabel('probability')
     at.set_title("Leakage graph")
-    at.legend(loc='lower left')
+    # at.legend(loc='lower left')
     # plt.yscale("log")
     plt.show()
 
+
 num_timestemps = config['num_timesteps']
+
 
 def pulse_show(pulse_list):
     pulse_period = 2 * np.pi / config['omega_osc']
-    tau = pulse_period/ num_timestemps
-    axis = [x*tau for x in range(len(pulse_list)*num_timestemps)]
+    tau = pulse_period / num_timestemps
+    axis = [x * tau for x in range(len(pulse_list) * num_timestemps)]
 
     pulses = []
     for pulse in pulse_list:
-        pulse_timed = [pulse*config['amp'] if x < config['pulse_time'] else 0 for x in range(num_timestemps)]
+        pulse_timed = [pulse * config['amp'] if x < config['pulse_time'] else 0 for x in range(num_timestemps)]
         pulses += pulse_timed
     fig, at = plt.subplots()
     at.plot(axis, pulses, label='pulses')
@@ -226,39 +196,23 @@ def pulse_show(pulse_list):
     at.set_ylabel('amplitude')
     plt.show()
 
+
 if __name__ == '__main__':
-    pulse_str = '-1-11111-1-1-1111111-1-101111-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-11111-1-1-1-111110-1-1-101111-1-1-1-111111-1-1-111100-1-1-10111-1-1-1-1011-1-1-1-1-11111'
-    pulse_str =   '-1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1-1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1   1   1   1   1   0  -1  -1  -1   01   1   1  -1  -1  -1  -1   0   1   1   1   0  -1  -1  -1   0   0   1 1   1   0  -1  -1  -1   0   1   1   1   0  -1  -1  -1   0   1   1   10   0  -1  -1   0   0   1   1  -1  -1  -1  -1  -1   0   1   1   1   0-1  -1  -1  -1   1   1   1   0   0  -1  -1  -1'
 
-    pulse_str = ' -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1-1  -1  -1   1   1   1  -1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -11   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -1  -1   11   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -1   1   1   11  -1  -1  -1  -1   0   1   1   1   0  -1  -1  -1  -1   1   1   1   1-1  -1  -1   1   1   1   1   0  -1  -1  -1  -1'
-
-    pulse_str = '-1  -1  -1  -1   1   1   1   0  -1  -1  -1  -1   1   1   1   0  -1  -1-1  -1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1-1   1   1   1   0  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   01   1   1   0  -1  -1  -1   0   1   1   1   0  -1  -1  -1   0   1   11   0  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   0   1   1   10  -1  -1  -1   0   1   1   1   0  -1  -1  -1  -1   1   1   1   0  -1-1  -1  -1   0   1   1   1   0  -1  -1  -1   0'
-
-    pulse_str =  '1  -1   1   1   1   1   1   1  -1  -1  -1   1   1   1   1   1  -1  -1-1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   11   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   11   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   1   11  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1   1   1   1  -1  -1-1  -1   1   1   1'
-
-    pulse_str = '-1  -1  -1   1   1   1  -1  -1  -1  -1   1   1   1   1   1  -1-1  -1  -1   1   1   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1-1   1   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -11   1   1   1  -1  -1  -1  -1  -1   1   1   1  -1  -1  -1  -1  -1   11   1   1  -1  -1  -1  -1   1   1   1   1  -1  -1  -1  -1  -1   1   11   1  -1  -1  -1   1   1   1   1   1  -1  -1  -1  -1   1   1   1   1-1  -1  -1  -1  -1   1   1      0   0   0   0'
-
-    # for omega = 5
-    pulse_str = '1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   11   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -10   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   10  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   01   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0'
-
-    pulse_str =  '1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   11   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -10   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   10  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   01   1   0  -1   0   1   1   0  -1   0   1   1   0  -1   0   1   1   0-1   0   1   1   0  -1   0   1   1  -1  -1  -1'
-
-    #pulse_str =  '1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1-1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   1   1  -1  -1  -1   11  -1  -1  -1   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -10   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -1   0   1   1-1  -1   0   1   1  -1  -1   0   1   1  -1  -1   0   1   1  -1  -1   01   1  -1  -1   0   1   0  -1  -1   0   1   0  -1  -1   0   1   0  -1-1   1   0  -1  -1   0   1  -1  -1  -1  -1   0  -1   0   0  -1   0'
+    pulse_str = config['example_scallop']
     pulse_str = pulse_str.replace('1', '1,')
     pulse_str = pulse_str.replace('0', '0,')
     pulse_list = pulse_str.split(',')
     pulse_list.pop(-1)
-    pulses = re.findall(r'[+-]?\d',pulse_str)
-    pulses_str =''
-
-
+    pulses = re.findall(r'[+-]?\d', pulse_str)
+    pulses_str = ''
 
     for pulse in pulses:
         pulses_str += pulse
-    print(pulses_str)
-    pulse_list = [int(pulse) for pulse in pulse_list]
 
-    win, end_probability_ground,end_probability_excited,end_probability_third = simulation(pulse_list=pulse_list)
-    print(f'Reward: {win}')
-    #plot_show(ground=end_probability_ground, excited=end_probability_excited, third=end_probability_third)
-    pulse_show(pulse_list)
+    pulse_list = [int(pulse) for pulse in pulse_list]
+    print(pulses_str)
+    win, end_probability_ground, end_probability_excited, end_probability_third = simulation(pulse_list=pulse_list)
+    print(f'Reward: {win:.3e}')
+    plot_show(ground=end_probability_ground, excited=end_probability_excited, third=end_probability_third)
+    # pulse_show(pulse_list)

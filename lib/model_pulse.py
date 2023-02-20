@@ -224,9 +224,11 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
             result = reward
             state_array = np.frombuffer(state, dtype=int)
             state_array = state_array[:subarray_length]
+            num_repetitions = int(args['pulse_array_length'] / subarray_length)
             if reward > reward_threshold:
                 logs.debug(f'State:  {state_array}')
                 logs.debug(f'Length:{subarray_length}')
+                logs.debug(f'Number of repetitions:{num_repetitions}')
                 reward_threshold = reward
                 # train.reward_threshold = reward
                 if replay_buffer is not None:
@@ -236,7 +238,6 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
                         )
             # save the best pulse lists into a separate txt file
             if result > args['reward_threshold_to_save']:
-                num_repetitions = int(args['pulse_array_length']/subarray_length)
                 saves_path = os.path.join(args['save_folder_name'], args['run_name'])
                 best_pulses_save_path = os.path.join(saves_path, 'best_pulses.txt')
                 with open(best_pulses_save_path, 'a') as file:
@@ -245,7 +246,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
             if enable_highlight:
                 logs.debug(f'State:  {state_array}')
                 logs.debug(f'Length:{subarray_length}')
-            logs.debug(f'Result: {result:.5f}')
+            logs.debug(f'Reward:{result:.3f}, Infidelity: {1-result:.2e}')
             break
 
         current_index += 1  # after a move is executed, go to the next index
