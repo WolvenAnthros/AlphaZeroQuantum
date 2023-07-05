@@ -4,6 +4,7 @@ import collections
 import os
 import numpy as np
 # logging module
+import old_simspeed
 from logger import logger as logs
 # conv NNet is written on Pytorch
 import torch
@@ -11,11 +12,18 @@ import torch.nn as nn
 # get config and parameters
 from lib.args import args
 # game and MCTS
+
 from lib import mcts_pulse as mcts
-from lib import game_pulse as game
+
+if args['gates_computing']:
+    import gate_calculation as game
+else:
+    from lib import game_pulse as game
+    from simulation_speed import reward_calculation
 
 # initialize parameters for body convolutional layers
 observation_shape = (1, args['pulse_array_length'])
+gates = args['gates_computing']
 
 conv_kernel_size = args['convNet_config']['conv_layers_kernel_size']
 conv_layers_padding = args['convNet_config']['conv_layers_padding']
@@ -150,11 +158,10 @@ def state_lists_to_batch(state_lists, device='cpu'):
     batch = np.zeros((batch_size,) + observation_shape,
                      dtype=np.float)  # an array of zeros with the shape of (batch_size,1,PULSE_LENGTH)
     for idx, state in enumerate(state_lists):
-        state_array = np.frombuffer(state, dtype=int)
+        if gates:
+            state = state[:game.game_length]  # FIXME: state truncation
+        state_array = np.array(state, dtype=int)
         batch[idx] = state_array
-        # string representation, deprecated
-        # state_array = np.array(re.findall(r'(?<!\s)(?<!\s\d)(?<!\s\d{2})[+-]?\d', state),dtype=int) # tight printing
-        # state_array = np.array(re.findall(r'[+-]?\d', state), dtype=int)
     # create an array based on a string, separator is a whitespace pytotch Tensor is a ndmatrix, so it is inferred
     # that batch should  have the dimensionality of [state_lists,1,PULSE_LENGTH]
     return torch.tensor(batch).to(device,
@@ -191,7 +198,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         mcts_stores = mcts_stores  # fill it with saved results
 
     state = game.INITIAL_STATE  # initialize the game state
-    current_index = 0  # initialize the index
+    current_index = game.INITIAL_INDEX  # initialize the index
 
     step = 0  # initialize steps befofe deterministic approach (tau=0)
     tau = 1 if steps_before_tau_0 > 0 else 0  # to not let our noise interfere the final picture
@@ -215,32 +222,55 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         game_history.append((state, probs))  # game history saving
         action = np.random.choice(mcts.action_num, p=probs)
 
-        # execute a game move
+        # # execute a game move
+        # show_action = game.operations_list[action]()
+        # game.operation_history.append(str(show_action))
         state, reward, done = game.move(state=state, idx=current_index, action=action)  # get reward and next state
+        if args['gates_computing']:
+            result_game_state, result_quantum_state = game.decode(state)
+            result_game_state = list(result_game_state)
+            for idx, elem in enumerate(result_game_state[:current_index+1]):
+                result_game_state[idx] = game.operations_list[elem].__name__
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if reward > reward_threshold or done or reward > 1:
+        if reward > reward_threshold or done:  #
+            result_show = 0
+            if not args['gates_computing']:
+                result_state = state
+                result_show = reward_calculation(pulse_list=result_state)
+                result_state = list(result_state)
+
+            # for elem in result_state[:re]
+
+            probability = 0
+            probability = old_simspeed.probability_calculation(result_state)
+
+            # logs.debug(f'Operations: {game.operation_history}')
+            # game.operation_history = []
             result = reward
+
+            if enable_highlight:
+                logs.debug(f'State:  {result_state}')
             if reward > reward_threshold:
-                logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')
                 reward_threshold = reward
-                # train.reward_threshold = reward
+                if not enable_highlight:
+                    logs.debug(f'State: {result_state}')
                 if replay_buffer is not None:
                     for state, probs in reversed(game_history):
                         replay_buffer.append(
                             (state, probs, result)
                         )
             # save the best pulse lists into a separate txt file
-            if result > args['reward_threshold_to_save']:
+            if result_show > args['reward_threshold_to_save']:
+                result_state = result_state
                 saves_path = os.path.join(args['save_folder_name'], args['run_name'])
-                best_pulses_save_path = os.path.join(saves_path, 'best_pulses.txt')
+                best_pulses_save_path = os.path.join(saves_path, 'Pulses_evolution.txt')
                 with open(best_pulses_save_path, 'a') as file:
-                    file.write(f'State: {np.frombuffer(state, dtype=int)} \n Result: {result} \n')
-            if enable_highlight:
-                logs.debug(f'State:  {np.frombuffer(state, dtype=int)}')
-            logs.debug(f'Result: {result:.3f}, Infidelity: {1-result:.2e}')
-            break
+                    file.write(f'State: {result_state} \n Result: {result} \n')
 
+            logs.debug(f'Fidelity: {result_show:.4f}, True reward:{result:.4f}, Proba: {probability:.3f}')
+            break
+            # Index residual:{idx_residual*(current_index/lib.game_pulse.MAX_PULSE_LENGTH):.3g},
         current_index += 1  # after a move is executed, go to the next index
         step += 1  # increment tau steps
         if step >= steps_before_tau_0:

@@ -1,4 +1,5 @@
 # logs
+import lib.args
 from logger import logger as logs
 # to create the save folder
 import os
@@ -17,7 +18,7 @@ import numpy as np
 # summary show
 from tensorboardX import SummaryWriter
 # import hyperparameters
-from lib.args import args
+
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -68,13 +69,14 @@ def evaluate(net1, net2, rounds, device="cpu",
 
 
 if __name__ == "__main__":
-    # console input not used for now
+    #console input not used for now
     # parser = argparse.ArgumentParser()
     # parser.add_argument("-n", "--name", required=True, help="Name of the run")
     # parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     # args = parser.parse_args()
-
+    lib.args.run_name = str(input('Enter run name: '))
     # initial parameters
+    from lib.args import args
     config_training = args['training_config']
     config_eval = args['evaluation_config']
     min_replays = config_training['min_replay_to_train']
@@ -109,18 +111,24 @@ if __name__ == "__main__":
     print(net)
 
     # we track the net progress as it learns
-    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+    with ptan.common.utils.TBMeanTracker(writer, batch_size=5) as tb_tracker:
         # NNet trains until user stops the process
         while True:
             t = time.time()
             prev_nodes = len(mcts_store)
             game_steps = 0
             # play game, update reward threshold if necessary
-            _, steps, new_threshold = model.play_game(mcts_store, replay_buffer, net=best_net.target_model,
+            result, steps, new_threshold = model.play_game(mcts_store, replay_buffer, net=best_net.target_model,
                                                       steps_before_tau_0=config_training['steps_before_tau_0'],
                                                       mcts_searches=config_training['MCTS_batch_searches'],
                                                       mcts_batch_size=config_training['MCTS_batch_size'], device=device,
-                                                      reward_threshold=reward_threshold, enable_highlight=False)
+                                                      reward_threshold=reward_threshold, enable_highlight=args['enable_highlight'])
+
+            # REMIND: tracking reward for every iteration
+            reward_tracking_saves_path = os.path.join(saves_path, f'rewards_{lib.args.run_name}.csv')
+            with open(reward_tracking_saves_path, 'a') as file:
+                file.write(f'{step_idx},{result} \n')
+
             game_steps += steps
             reward_threshold = new_threshold
 
@@ -179,6 +187,7 @@ if __name__ == "__main__":
             tb_tracker.track("loss_total", sum_loss / config_training['training_rounds'], step_idx)
             tb_tracker.track("loss_value", sum_value_loss / config_training['training_rounds'], step_idx)
             tb_tracker.track("loss_policy", sum_policy_loss / config_training['training_rounds'], step_idx)
+            tb_tracker.track("Result", result, step_idx)
 
             # after certain amount of self-play games, Net_vs_Net evaluation games are performed
             if step_idx % config_eval['num_steps_before_evaluation'] == 0:

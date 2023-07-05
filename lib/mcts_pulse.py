@@ -1,4 +1,5 @@
 # game and the convolutional NNet
+from logger import logger as logs
 from lib import model_pulse as model
 # math libraries
 import math as m
@@ -7,7 +8,10 @@ import numpy as np
 import torch.nn.functional as F
 # get config and parameters
 from lib.args import args
-from lib import game_pulse as game
+if args['gates_computing']:
+    import gate_calculation as game
+else:
+    from lib import game_pulse as game
 
 config = args['MCTS_config']
 action_num = args['number_of_actions']
@@ -65,8 +69,6 @@ class MCTS:
         current_state = state
         current_index = index
         value = None
-        is_explored_node = current_state in self.probs  # leaf node - any node that has a potential child \
-        # from which no rollout was initiated
 
         # We traverse the game tree until we find a game end/an unexplored leaf node
         while current_state in self.probs:
@@ -90,23 +92,27 @@ class MCTS:
                 for value, prob, count in
                 zip(actions_avg_values, probs, action_visits)
             ]
-            # all actions are valid, so we skip that part
+
             action = int(np.argmax(ucb_score))  # we always choose an action based entirely on UCB score
             # argmax returns the indices of the maximum values along an axis (list in our case), \
             # so we should name our actions as (0,1,2)
             actions.append(action)  # save action
+
             current_state, reward, done = game.move(
                 state=current_state,
                 idx=current_index,
                 action=action
             )
-            current_index += 1  # index extension
+
             # if our reward is non-zero, which means that the game is ended
-            # value = reward
-            if reward > reward_threshold or done:
+            if reward > reward_threshold or done:  # REMIND: mcts reward>reward threshold
                 value = reward
-            # if done:
-            #     value = 0
+
+            current_index += 1  # index extension
+
+            # if current_index % 1000 == 0:
+            #     logs.critical('Something went wrong')
+
         return value, current_state, current_index, states, actions
 
     def search_batch(self, count, batch_size, state,
@@ -149,6 +155,8 @@ class MCTS:
         for _ in range(num_searches):
             value, leaf_state, leaf_index, states, actions = self.find_leaf(state=state, index=index,
                                                                             reward_threshold=reward_threshold)
+            # logs.info(f'\nLeaf index: {leaf_index}, actions = {actions}, leaf value = {value}, \n leaf state {
+            # leaf_state}')
 
             if value is not None:  # if we reached the end of the game
                 backpropagation_queue.append((value, states, actions))  # save the result for backpropagation
