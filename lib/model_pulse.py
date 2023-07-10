@@ -221,7 +221,8 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         probs, _ = mcts_stores.get_policy_value(state=state, tau=tau)
         game_history.append((state, probs))  # game history saving
         action = np.random.choice(mcts.action_num, p=probs)
-
+        if action not in game.allowed_moves(state):
+            logs.critical(f'Prohibited move: {action}')
         # # execute a game move
         # show_action = game.operations_list[action]()
         # game.operation_history.append(str(show_action))
@@ -233,7 +234,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
                 result_game_state[idx] = game.operations_list[elem].__name__
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if reward > reward_threshold or done:  #
+        if done:  #  reward > reward_threshold or
             result_show = 0
             if not args['gates_computing']:
                 result_state = state
@@ -251,7 +252,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
 
             if enable_highlight:
                 logs.debug(f'State:  {result_state}')
-            if reward > reward_threshold:
+            if True: # reward > reward_threshold
                 reward_threshold = reward
                 if not enable_highlight:
                     logs.debug(f'State: {result_state}')

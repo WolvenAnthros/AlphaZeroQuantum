@@ -92,6 +92,12 @@ class MCTS:
                 for value, prob, count in
                 zip(actions_avg_values, probs, action_visits)
             ]
+            # REMIND: masking prohibited moves
+            action_sequence = [x for x in range((game.max_sequence_length-1) * game.polarities_num)]
+            action_sequence.append(-1)
+            prohibited_actions = set(action_sequence) - set(game.allowed_moves(current_state))
+            for prohibited in prohibited_actions:
+                ucb_score[prohibited] = -np.inf
 
             action = int(np.argmax(ucb_score))  # we always choose an action based entirely on UCB score
             # argmax returns the indices of the maximum values along an axis (list in our case), \
@@ -105,13 +111,14 @@ class MCTS:
             )
 
             # if our reward is non-zero, which means that the game is ended
-            if reward > reward_threshold or done:  # REMIND: mcts reward>reward threshold
+            if done:  # REMIND: mcts reward>reward threshold  reward > reward_threshold or
                 value = reward
 
             current_index += 1  # index extension
 
-            # if current_index % 1000 == 0:
-            #     logs.critical('Something went wrong')
+            if current_index % 250 == 0:
+                logs.critical(f'State: {current_state}, \n'
+                              f' action {action}, current_index {current_index}, prohibited: {prohibited_actions} ')
 
         return value, current_state, current_index, states, actions
 
@@ -155,8 +162,11 @@ class MCTS:
         for _ in range(num_searches):
             value, leaf_state, leaf_index, states, actions = self.find_leaf(state=state, index=index,
                                                                             reward_threshold=reward_threshold)
-            # logs.info(f'\nLeaf index: {leaf_index}, actions = {actions}, leaf value = {value}, \n leaf state {
-            # leaf_state}')
+            # logs.info(f'\nLeaf index: {leaf_index}, '
+            #           f'actions = {actions}, '
+            #           f'leaf value = {value}, '
+            #           f'\n leaf state {leaf_state} '
+            #           f'\n initial state{state}')
 
             if value is not None:  # if we reached the end of the game
                 backpropagation_queue.append((value, states, actions))  # save the result for backpropagation
