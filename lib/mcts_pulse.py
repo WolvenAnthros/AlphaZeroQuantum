@@ -92,10 +92,13 @@ class MCTS:
                 for value, prob, count in
                 zip(actions_avg_values, probs, action_visits)
             ]
-            # REMIND: masking prohibited moves
-            action_sequence = [x for x in range((game.max_sequence_length-1) * game.polarities_num)]
-            action_sequence.append(-1)
+            # masking prohibited moves
+            action_sequence = game.initial_actions_list.copy()
+            action_sequence = np.append(action_sequence, -1) # -1 means invalid action
             prohibited_actions = set(action_sequence) - set(game.allowed_moves(current_state))
+            '''
+            If there is only -1 in prohibited actions list, it means that all actions are possible
+            '''
             for prohibited in prohibited_actions:
                 ucb_score[prohibited] = -np.inf
 

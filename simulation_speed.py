@@ -84,7 +84,7 @@ alpha_state_list = np.array([AlphaState(dimensions, i).matrix for i in range(1, 
 u_t_plus, u_t_minus, u_t_zero = U(1).matrix, U(-1).matrix, U(0).matrix
 
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def reward_calculation(pulse_list):
     fidelity = 0
     u_matrix = identity_matrix

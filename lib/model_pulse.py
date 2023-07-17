@@ -4,7 +4,7 @@ import collections
 import os
 import numpy as np
 # logging module
-import old_simspeed
+import probability_calc
 from logger import logger as logs
 # conv NNet is written on Pytorch
 import torch
@@ -244,7 +244,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
             # for elem in result_state[:re]
 
             probability = 0
-            probability = old_simspeed.probability_calculation(result_state)
+            probability = probability_calc.probability_calculation(result_state)
 
             # logs.debug(f'Operations: {game.operation_history}')
             # game.operation_history = []
