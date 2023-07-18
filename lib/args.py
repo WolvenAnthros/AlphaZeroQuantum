@@ -9,7 +9,7 @@ Dictionary of hyperparameters and configs
 """
 args = {
     'training_config': {
-        'MCTS_batch_searches': 10,  # 258
+        'MCTS_batch_searches': 12,  # 258
         'MCTS_batch_size': 1,
         'replay_buffer': 80000,  # max replay buffer size
         'learning_rate': 0.1,  # learning rate constant 0.1
@@ -45,7 +45,7 @@ args = {
         'probability/leakage_reward_tradeoff': 0.9,  # excited state probability multiplier
         # 'desired_leakage': 0.0001
     },
-    'pulse_array_length': 125 + 1,  #
+    'pulse_array_length': 125,  #
     'reward_threshold': 0.0003,
     'reward_threshold_to_save': 0.99,
     'reset_reward_threshold_after_eval': False,

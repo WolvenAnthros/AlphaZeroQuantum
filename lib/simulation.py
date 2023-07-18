@@ -1,6 +1,8 @@
 import math
 import numpy as np
 import plotly.graph_objects as go
+
+import simulation_speed
 from logger import logger as logs
 from simulation_speed import reward_calculation, wait_calculation
 from lib.args import args
@@ -72,7 +74,7 @@ ground_state = np.array(eigenpsi[:, [0]])
 
 def simulation(
         pulse_list=None,
-        amp=4,
+        amp=3, #
         pulse_time=config['pulse_time']
 ):
     if pulse_list is None:
@@ -144,15 +146,13 @@ def simulation(
                         probability_high = high_state.transpose() @ psi.conjugate()
                         probability_high = abs(np.sum(probability_high)) ** 2
                         leakage += probability_high
-
+                    logs.info(f'leakage: {leakage:.2e}')
 
                     # return 1, end_probability_ground, end_probability_excited, end_probability_third
 
             else:
                 probability_third = 0
                 end_probability_third.append(probability_third)
-
-    logs.info(f'leakage: {leakage:.2e}')
 
     return abs(probability_excited * 2), end_probability_ground, end_probability_excited, end_probability_third
 
@@ -285,6 +285,8 @@ def pulse_show(pulse_list):
 if __name__ == '__main__':
 
     pulse_str = config['example_scallop']  # leakage ~10^-4
+    pulse_str = '111-1-10110-1-1-11110-1-1011-1-10110-1-1-11010-1-1111-1-1-1-1110-1-1-1110-1-1-1011-1-1-1111-1-1-1-11110-101111-1-10111-1-11101-1-1-11100-1-11110-10111-1-1-1011-1-1-1111-1-1-101'
+    pulse_str = '1110-1-1-1-11110-1-1-1-11100-1-1-1111110-1-111111-1-1-1-11111-1-1-101111-1-1-1-1-11111-1-1-1-10111-1-10-10111-1-1-1-1-111111-1-1-111-110-1-1-1-1011-1-1-10111110-1011111-1-1-1-111'
     pulse_str = pulse_str.replace('1', '1,')
     pulse_str = pulse_str.replace('0', '0,')
     pulse_list = pulse_str.split(',')
@@ -298,6 +300,14 @@ if __name__ == '__main__':
     pulse_list = [int(pulse) for pulse in pulse_list]
     print(pulse_list)
 
+    pulse_list = [1, 1, 1, 0, -1, -1, -1, -1, 1, 1, 1, 0, -1, -1, -1, -1, 1, 1, 0, 0, -1, -1, -1, 1, 1, 1, 1, 1, 0, -1, -1, 1, 1, 1, 1, 1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, 0, 1, 1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1,
+     -1, 0, 1, 1, 1, -1, -1, 0, -1, 0, 1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, -1, -1, -1, 1, 1, -1, 1, 0, -1, -1, -1, -1, 0, 1, 1, -1, -1, -1, 0, 1, 1, 1, 1, 1, 0, -1, 0, 1, 1, 1, 1, 1, -1, -1, -1, -1, 1, 1]
+
+#     pulse_list = [0, 1, 1, 0, 0, -1, -1, 1, 1, 1, 1, 0, 1, 0, 0, -1, 1, 0, 1, 1, 1, -1, -1, -1, 1, 1, 1, 1, 0, 0, -1, 0, 1, 1, 1, 0, 1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, -1, 1, 1, 1, 1, -1, 0, -1, -1, 1, 1, 1, 1, -1, -1, -1, -1, -1
+# , 1, 1, 1, 0, -1, -1, -1, -1, 1, 0, 1, 1, -1, -1, -1, 0, 1, 1, 1, 1, 0, -1, -1, -1, 1, 0, 1, 1, 0, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 0, 1, -1, -1, -1, 0, 0, 1, 1]
+
+
+
     _, end_probability_ground, end_probability_excited, end_probability_third = simulation(pulse_list=pulse_list)
 
     fidelity = reward_calculation(pulse_list=pulse_list)
@@ -309,4 +319,5 @@ if __name__ == '__main__':
 
     plot_show(ground=end_probability_ground, excited=end_probability_excited, third=end_probability_third,
               fidelity_=fidelity)
+
     pulse_show(pulse_list)
