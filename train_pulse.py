@@ -103,6 +103,7 @@ if __name__ == "__main__":
 
     # initialize NNets for Best Player and Apprentice
     net = model.Net(input_shape=model.observation_shape, actions_n=action_num).to(device)
+    net.eval() # REMIND: added eval model
     best_net = ptan.agent.TargetNet(net)
     optimizer = optim.SGD(net.parameters(), lr=config_training['learning_rate'],
                           momentum=config_training['SGD_momentum'])

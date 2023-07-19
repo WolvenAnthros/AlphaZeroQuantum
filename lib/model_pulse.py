@@ -22,13 +22,15 @@ else:
     from simulation_speed import reward_calculation
 
 # initialize parameters for body convolutional layers
-observation_shape = (1, args['pulse_array_length'])
+observation_shape = (args['pulse_array_length'],)
 gates = args['gates_computing']
 
 conv_kernel_size = args['convNet_config']['conv_layers_kernel_size']
 conv_layers_padding = args['convNet_config']['conv_layers_padding']
 conv_num_filters = args['convNet_config']['num_filters']
 conv_padding = args['convNet_config']['conv_layers_padding']
+input_layer_size = 600
+layer_size = 400
 
 
 class Net(nn.Module):
@@ -41,80 +43,49 @@ class Net(nn.Module):
 
     def __init__(self, input_shape, actions_n):
         super(Net, self).__init__()
-        # convolutional input layer
-        self.conv_input = nn.Sequential(
-            nn.Conv1d(in_channels=input_shape[0], out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),
-            # input_shape[0] stands for OBSERVATION_SHAPE[0] since convNet accepts data BY CHANNELS
-            # padding and stride = 1 by default
-            nn.BatchNorm1d(conv_num_filters),  # BatchNormalization for every feature map
-            nn.LeakyReLU()  # LeakyReLU activation function
+        self.input_layer = nn.Sequential(
+            nn.Linear(in_features=args['pulse_array_length'], out_features=input_layer_size),
+            nn.BatchNorm1d(input_layer_size),
+            nn.LeakyReLU()
         )
         # simplified residual layers
-        self.conv_1 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),  # input dim = output dim
-            nn.BatchNorm1d(conv_num_filters),
+        self.layer_1 = nn.Sequential(
+            nn.Linear(in_features=layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
-        self.conv_2 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),
-            nn.BatchNorm1d(conv_num_filters),
+        self.layer_2 = nn.Sequential(
+            nn.Linear(in_features=layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
-        self.conv_3 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),  # input dim = output dim
-            nn.BatchNorm1d(conv_num_filters),
+        self.layer_3 = nn.Sequential(
+            nn.Linear(in_features=layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
-        self.conv_4 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),  # input dim = output dim
-            nn.BatchNorm1d(conv_num_filters),
+        self.layer_4 = nn.Sequential(
+            nn.Linear(in_features=layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
-        self.conv_5 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),  # input dim = output dim
-            nn.BatchNorm1d(conv_num_filters),
+        self.layer_5 = nn.Sequential(
+            nn.Linear(in_features=layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
-        self.conv_6 = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=conv_num_filters, kernel_size=conv_kernel_size,
-                      padding=conv_padding),  # input dim = output dim
-            nn.BatchNorm1d(conv_num_filters),
-            nn.LeakyReLU()
-        )
-        # reshape the input for value/policy head (ResNet peculiar feature)
-        body_out_shape = (conv_num_filters,) + input_shape[1:]
-
         # value head ( convolutional layer -> linear layer -> output )
-        self.conv_value = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=1, kernel_size=1),
-            # single feature map with kernel = 1
-            nn.BatchNorm1d(1),
-            nn.LeakyReLU()
-        )
-        conv_value_size = self._get_conv_val_size(body_out_shape)
         self.value = nn.Sequential(
-            nn.Linear(in_features=conv_value_size, out_features=20),
+            nn.Linear(in_features=layer_size, out_features=120),
             # please consider putting all of these params into a single dict
             nn.LeakyReLU(),
-            nn.Linear(in_features=20, out_features=1),
+            nn.Linear(in_features=120, out_features=1),
             nn.Tanh()
         )
-
         # policy head
-        self.conv_policy = nn.Sequential(
-            nn.Conv1d(in_channels=conv_num_filters, out_channels=1, kernel_size=1),
-            nn.BatchNorm1d(1),
-            nn.LeakyReLU()
-        )
-        conv_policy_size = self._get_conv_policy_size(body_out_shape)
         self.policy = nn.Sequential(
-            nn.Linear(in_features=conv_policy_size, out_features=actions_n)
+            nn.Linear(in_features=layer_size, out_features=actions_n),
+            nn.Sigmoid()
         )
 
     def _get_conv_val_size(self,
@@ -127,22 +98,14 @@ class Net(nn.Module):
         return int(np.prod(o.size()))
 
     def forward(self, x):
-        """
-        Technical implementation of the NNet, part of Pytorch syntax
-        """
-        batch_size = x.size()[0]
-        v = self.conv_input(x)
-        v = v + self.conv_1(v)
-        v = v + self.conv_2(v)
-        v = v + self.conv_3(v)
-        v = v + self.conv_4(v)
-        v = v + self.conv_5(v)
-        v = v + self.conv_6(v)
-        value = self.conv_value(v)  # depends on body layers
-        value = self.value(value.view(batch_size,
-                                      -1))  # see nn.Tensor.view() documentation
-        policy = self.conv_policy(v)  # depends on body layers
-        policy = self.policy(policy.view(batch_size, -1))
+        v = self.input_layer(x)
+        v = v + self.layer_1(v)
+        v = v + self.layer_2(v)
+        v = v + self.layer_3(v)
+        v = v + self.layer_4(v)
+        v = v + self.layer_5(v)
+        value = self.value(v)
+        policy = self.policy(v)
         return policy, value
 
 
@@ -230,11 +193,11 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         if args['gates_computing']:
             result_game_state, result_quantum_state = game.decode(state)
             result_game_state = list(result_game_state)
-            for idx, elem in enumerate(result_game_state[:current_index+1]):
+            for idx, elem in enumerate(result_game_state[:current_index + 1]):
                 result_game_state[idx] = game.operations_list[elem].__name__
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if done:  #  reward > reward_threshold or
+        if done:  # reward > reward_threshold or
             result_show = 0
             if not args['gates_computing']:
                 result_state = state
@@ -252,7 +215,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
 
             if enable_highlight:
                 logs.debug(f'State:  {result_state}')
-            if True: # reward > reward_threshold
+            if True:  # reward > reward_threshold
                 reward_threshold = reward
                 if not enable_highlight:
                     logs.debug(f'State: {result_state}')
