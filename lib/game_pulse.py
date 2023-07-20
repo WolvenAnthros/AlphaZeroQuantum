@@ -43,7 +43,7 @@ def move(state, idx, action):
     state_array[index] = true_action - 1  # if action=0 -> 0-1 = -1 -> actual action
 
     reward = reward_calculation(pulse_list=state_array)
-    reward = 1 - ((1 - reward) / 1) ** 1
+    reward = 1 - ((1 - reward) / 1) ** 0.5
     reward = round(reward, 4)
 
     done = False

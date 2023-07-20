@@ -43,43 +43,38 @@ class Net(nn.Module):
 
     def __init__(self, input_shape, actions_n):
         super(Net, self).__init__()
-        self.input_layer = nn.Sequential(
+        self.fc_layers = nn.Sequential(
+            # input
             nn.Linear(in_features=args['pulse_array_length'], out_features=input_layer_size),
             nn.BatchNorm1d(input_layer_size),
-            nn.LeakyReLU()
-        )
-        # simplified residual layers
-        self.layer_1 = nn.Sequential(
+            nn.LeakyReLU(),
+            # 1
+            nn.Linear(in_features=input_layer_size, out_features=input_layer_size),
+            nn.BatchNorm1d(input_layer_size),
+            nn.LeakyReLU(),
+            # 2
+            nn.Linear(in_features=input_layer_size, out_features=layer_size),
+            nn.BatchNorm1d(layer_size),
+            nn.LeakyReLU(),
+            # 3
             nn.Linear(in_features=layer_size, out_features=layer_size),
             nn.BatchNorm1d(layer_size),
-            nn.LeakyReLU()
-        )
-        self.layer_2 = nn.Sequential(
+            nn.LeakyReLU(),
+            # 4
             nn.Linear(in_features=layer_size, out_features=layer_size),
             nn.BatchNorm1d(layer_size),
-            nn.LeakyReLU()
-        )
-        self.layer_3 = nn.Sequential(
-            nn.Linear(in_features=layer_size, out_features=layer_size),
-            nn.BatchNorm1d(layer_size),
-            nn.LeakyReLU()
-        )
-        self.layer_4 = nn.Sequential(
-            nn.Linear(in_features=layer_size, out_features=layer_size),
-            nn.BatchNorm1d(layer_size),
-            nn.LeakyReLU()
-        )
-        self.layer_5 = nn.Sequential(
+            nn.LeakyReLU(),
+            # 5
             nn.Linear(in_features=layer_size, out_features=layer_size),
             nn.BatchNorm1d(layer_size),
             nn.LeakyReLU()
         )
         # value head ( convolutional layer -> linear layer -> output )
         self.value = nn.Sequential(
-            nn.Linear(in_features=layer_size, out_features=120),
+            nn.Linear(in_features=layer_size, out_features=400),
             # please consider putting all of these params into a single dict
             nn.LeakyReLU(),
-            nn.Linear(in_features=120, out_features=1),
+            nn.Linear(in_features=400, out_features=1),
             nn.Tanh()
         )
         # policy head
@@ -98,12 +93,7 @@ class Net(nn.Module):
         return int(np.prod(o.size()))
 
     def forward(self, x):
-        v = self.input_layer(x)
-        v = v + self.layer_1(v)
-        v = v + self.layer_2(v)
-        v = v + self.layer_3(v)
-        v = v + self.layer_4(v)
-        v = v + self.layer_5(v)
+        v = self.fc_layers(x)
         value = self.value(v)
         policy = self.policy(v)
         return policy, value
@@ -123,8 +113,8 @@ def state_lists_to_batch(state_lists, device='cpu'):
     for idx, state in enumerate(state_lists):
         if gates:
             state = state[:game.game_length]  # FIXME: state truncation
-        state_array = np.array(state, dtype=int)
-        batch[idx] = state_array
+        #state_array = np.array(state, dtype=int)
+        batch[idx] = state
     # create an array based on a string, separator is a whitespace pytotch Tensor is a ndmatrix, so it is inferred
     # that batch should  have the dimensionality of [state_lists,1,PULSE_LENGTH]
     return torch.tensor(batch).to(device,

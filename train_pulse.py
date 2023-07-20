@@ -146,7 +146,7 @@ if __name__ == "__main__":
             leaves \u001b[37;1m%4d\u001b[0m \
             steps/s \u001b[37;1m%5.2f\u001b[0m \
             leaves/s \u001b[37;1m%6.2f\u001b[0m \
-            win_eval_count \u001b[31;1m%d\u001b[0m \
+            sync_count \u001b[31;1m%d\u001b[0m \
             num_replays \u001b[37;1m%d\u001b[0m" % (
                 step_idx, game_nodes, speed_steps, speed_nodes, best_idx, len(replay_buffer)))
             step_idx += 1
@@ -192,20 +192,20 @@ if __name__ == "__main__":
 
             # after certain amount of self-play games, Net_vs_Net evaluation games are performed
             if step_idx % config_eval['num_steps_before_evaluation'] == 0:
-                win_ratio, best_eval_reward = evaluate(net, best_net.target_model,
-                                                       rounds=config_eval['evaluation_rounds'],
-                                                       device=device, reward_threshold=reward_threshold)
-                logs.critical("Net evaluated, win ratio = %.2f" % win_ratio)
-                writer.add_scalar("Apprentice/Best Player win ratio", win_ratio, step_idx)
-                writer.add_scalar("Best Apprentice evaluation reward", best_eval_reward, step_idx)
+                # win_ratio, best_eval_reward = evaluate(net, best_net.target_model,
+                #                                        rounds=config_eval['evaluation_rounds'],
+                #                                        device=device, reward_threshold=reward_threshold)
+                # logs.critical("Net evaluated, win ratio = %.2f" % win_ratio)
+                # writer.add_scalar("Apprentice/Best Player win ratio", win_ratio, step_idx)
+                # writer.add_scalar("Best Apprentice evaluation reward", best_eval_reward, step_idx)
                 # if Apprentice net has won the current Best Player, Apprentice becomes a new Best Player
-                if win_ratio > config_eval['best_net_win_ratio']:  # >=
-                    logs.critical("Net is better than cur best, sync")
-                    best_net.sync()
-                    best_idx += 1
-                    file_name = os.path.join(saves_path, "best_%03d_net_step_%05d.dat" % (best_idx, step_idx))
-                    torch.save(net.state_dict(), file_name)
-                    # MCTS buffers are cleared!
-                    mcts_store.clear()
-                    if args['reset_reward_threshold_after_eval']:
-                        reward_threshold = args['reward_threshold']
+                # if win_ratio > config_eval['best_net_win_ratio']:  # >=
+                logs.critical("Net synchronization")
+                #net.sync()
+                best_idx += 1
+                file_name = os.path.join(saves_path, "best_%03d_net_step_%05d.dat" % (best_idx, step_idx))
+                torch.save(net.state_dict(), file_name)
+                # MCTS buffers are cleared!
+                # mcts_store.clear() # REMIND: clear mcts stores or not?
+                if args['reset_reward_threshold_after_eval']:
+                    reward_threshold = args['reward_threshold']
