@@ -103,7 +103,7 @@ I = np.identity(dimensions)
 # operators of annihilation/creation
 annihilation = Operator(dimensions, 0).matrix
 creation = Operator(dimensions, 1).matrix
-# initial psi matrix
+# initial target_state matrix
 psi_matrix = Psi(dimensions).matrix
 # initial hamiltonian (for reliable calculation of eigenpsi)
 hamiltonian_0 = omega_01 * creation @ annihilation - mu / 2 * creation @ annihilation * (

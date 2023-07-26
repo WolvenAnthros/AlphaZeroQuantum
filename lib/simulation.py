@@ -80,7 +80,7 @@ def simulation(
     if pulse_list is None:
         raise ValueError("No pulse list provided")
 
-    psi = Psi(dimensions).matrix  # create psi matrix
+    psi = Psi(dimensions).matrix  # create target_state matrix
 
     # end_probability_excited|ground|third
     for n in ['excited', 'ground', 'third']:
@@ -91,7 +91,7 @@ def simulation(
         # print(f'Pulse:{pulse}, index: {index}')
         for k in range(counts):
 
-            # Start of psi calculation
+            # Start of target_state calculation
             t = lambda k_: k_ * tau
             if t(k) < pulse_time:
                 oscillatory_part = amp * pulse
