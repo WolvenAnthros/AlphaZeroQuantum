@@ -183,11 +183,11 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
         if args['gates_computing']:
             result_game_state, result_quantum_state = game.decode(state)
             result_game_state = list(result_game_state)
-            for idx, elem in enumerate(result_game_state[:current_index + 1]):
+            for idx, elem in enumerate(result_game_state):
                 result_game_state[idx] = game.operations_list[elem].__name__
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if done:  # reward > reward_threshold or
+        if  done:  # reward > reward_threshold or
             result_show = 0
             if not args['gates_computing']:
                 result_state = state
@@ -205,7 +205,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
 
             if enable_highlight:
                 logs.debug(f'State:  {result_state}')
-            if True:  # reward > reward_threshold
+            if reward > reward_threshold:  #
                 reward_threshold = reward
                 if not enable_highlight:
                     logs.debug(f'State: {result_state}')

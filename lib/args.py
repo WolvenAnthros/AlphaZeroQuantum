@@ -16,7 +16,7 @@ args = {
         'SGD_momentum': 0.9,  # gradient descent momentum
         'training_batch_size': 256,  # number of states randomly extracted from the buffer to train Apprentice
         'training_rounds': 120,  # number of Apprentice learning rounds after every Best Player self-play
-        'min_replay_to_train': 5000,  # minimal size of replay buffer to enable training
+        'min_replay_to_train': 2000,  # minimal size of replay buffer to enable training
         'steps_before_tau_0': 100  # number of gamesteps with forced exploration (noise applied to action probs)
     },
     'evaluation_config': {
