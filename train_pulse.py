@@ -165,7 +165,6 @@ if __name__ == "__main__":
                 batch = random.sample(replay_buffer, config_training['training_batch_size'])
                 batch_states, batch_probs, batch_values = zip(*batch)
                 batch_states_lists = [state for state in batch_states]
-
                 # and pass them to the NNet (Apprentice net)
                 states_v = model.state_lists_to_batch(state_lists=batch_states_lists, device=device)
                 optimizer.zero_grad()
@@ -188,6 +187,7 @@ if __name__ == "__main__":
             tb_tracker.track("loss_total", sum_loss / config_training['training_rounds'], step_idx)
             tb_tracker.track("loss_value", sum_value_loss / config_training['training_rounds'], step_idx)
             tb_tracker.track("loss_policy", sum_policy_loss / config_training['training_rounds'], step_idx)
+
             tb_tracker.track("Result", result, step_idx)
 
             # after certain amount of self-play games, Net_vs_Net evaluation games are performed
@@ -203,8 +203,8 @@ if __name__ == "__main__":
                 logs.critical("Net synchronization")
                 #net.sync()
                 best_idx += 1
-                file_name = os.path.join(saves_path, "best_%03d_net_step_%05d.dat" % (best_idx, step_idx))
-                torch.save(net.state_dict(), file_name)
+                file_name = os.path.join(saves_path, f'model_{step_idx}.pt')
+                torch.save(net, file_name)
                 # MCTS buffers are cleared!
                 # mcts_store.clear() # REMIND: clear mcts stores or not?
                 if args['reset_reward_threshold_after_eval']:
