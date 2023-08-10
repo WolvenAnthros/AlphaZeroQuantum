@@ -187,7 +187,7 @@ def play_game(mcts_stores, replay_buffer, net, steps_before_tau_0,
                 result_game_state[idx] = game.operations_list[elem].__name__
 
         # pass the game states in replay buffer only if the final state reward has exceeded the current reward threshold
-        if done:  # reward > reward_threshold or
+        if  done:  #  reward > reward_threshold or
             result_show = 0
             if not args['gates_computing']:
                 result_state = state

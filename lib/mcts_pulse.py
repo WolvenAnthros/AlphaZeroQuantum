@@ -195,11 +195,11 @@ class MCTS:
                 device=device
             )
             # let the net predict action probabilities and values
-            logits_v, values_v = net(batch_v)
+            logits_v, values_v = net(batch_v) # REMIND: grad_fn differs from the original (SigmoidBackward vs Adam)
 
             probs_v = F.softmax(logits_v, dim=1)
             # after prediction, convert them to numpy for further actions
-            values = values_v.data.cpu().numpy()  # [:, 0]
+            values = values_v.data.cpu().numpy()[0]  # REMIND: changed values interpretation from [[]] to []
             probs = probs_v.data.cpu().numpy()
             # then we create the nodes
             for (leaf_state, states, actions), value, prob in zip(expand_queue, values, probs):

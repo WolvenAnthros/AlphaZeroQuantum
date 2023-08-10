@@ -24,6 +24,21 @@ def allowed_moves(state):
     return actions_list
 
 
+def decode(num):
+    result = []
+    result.append(num%4)
+    for i in range(124):
+        num = num // 4
+        result.append(num%4)
+    return result[::-1]
+
+def mult(prev, a):
+    return prev * 4 + a
+
+#reduce(mult, arr)
+
+#decod_arr = decode(reduce(mult,arr))
+
 def move(state, idx, action):
     """
     Perform pulse at a given index in a given state
